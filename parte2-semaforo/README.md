@@ -8,18 +8,21 @@ Demonstração de uma condição de corrida em um contador compartilhado e sua c
 |---|---|
 | `ContadorSemSincronizacao.java` | Versão 1: T threads incrementam `count` sem nenhuma sincronização. |
 | `ContadorComSemaforo.java` | Versão 2: cada incremento é protegido por `Semaphore(1, true)` (binário e justo/FIFO). |
+| `Tabela.java` | Formata a tabela de resultados impressa no terminal. |
 
-Parâmetros usados: **T = 8 threads** e **M = 200.000 incrementos por thread**, valor esperado **T × M = 1.600.000**.
+Parâmetros usados: **T = 8 threads** e **M = 200.000 incrementos por thread**, valor esperado **T × M = 1.600.000**. Cada programa faz **3 execuções** seguidas e imprime a tabela com os resultados.
 
 ## Como executar
 
 Requer JDK 17+. Dentro da pasta `parte2-semaforo`:
 
 ```bash
-javac ContadorSemSincronizacao.java ContadorComSemaforo.java
+javac *.java
 java ContadorSemSincronizacao
 java ContadorComSemaforo
 ```
+
+A versão com semáforo leva alguns segundos por execução (veja a discussão sobre throughput).
 
 ## Resultados
 
@@ -27,21 +30,15 @@ Ambiente: Windows 11, Java HotSpot 17.0.9.
 
 ### Versão 1 — sem sincronização
 
-| Execução | Valor Esperado | Valor Obtido | Tempo Gasto |
-|---|---|---|---|
-| 1 | 1.600.000 | 448.846 | 77,04 ms |
-| 2 | 1.600.000 | 464.021 | 104,14 ms |
-| 3 | 1.600.000 | 1.338.842 | 51,46 ms |
+![Resultados da versão 1](img/versao1.png)
 
 ### Versão 2 — com semáforo binário (justo)
 
-| Execução | Valor Esperado | Valor Obtido | Tempo Gasto |
-|---|---|---|---|
-| 1 | 1.600.000 | 1.600.000 | 15.798,44 ms |
-| 2 | 1.600.000 | 1.600.000 | 14.184,89 ms |
-| 3 | 1.600.000 | 1.600.000 | 18.550,07 ms |
+![Resultados da versão 2](img/versao2.png)
 
-A versão sem sincronização perdeu entre ~16% e ~72% dos incrementos, com um resultado diferente a cada execução. A versão com semáforo chegou ao valor exato nas três execuções, mas foi cerca de **200 vezes mais lenta**.
+A versão sem sincronização perde uma grande parte dos incrementos, com um resultado diferente a cada execução. A versão com semáforo chega ao valor exato em todas as execuções, mas fica centenas de vezes mais lenta.
+
+> Na versão 1, `count` é declarado como `volatile`. Sem isso, a partir da segunda execução o JIT otimiza o laço e passa a somar tudo de uma vez, o que esconde a corrida. O `volatile` garante que cada `count++` leia e grave na memória, mas **não** torna a operação atômica, então a perda de incrementos continua.
 
 ## Discussão técnica
 
@@ -53,9 +50,9 @@ A operação `count++` parece única, mas não é atômica. Ela é executada em 
 2. **somar 1** no registrador;
 3. **gravar** o resultado de volta na memória.
 
-Como as 8 threads rodam ao mesmo tempo em núcleos diferentes, duas delas podem ler o mesmo valor (por exemplo, 100) antes que qualquer uma grave. As duas calculam 101 e gravam 101: foram feitos dois incrementos, mas o contador só avançou uma vez. Esse é o *lost update*, típico de uma condição de corrida. O resultado depende de como o escalonador intercala as threads, por isso muda a cada execução (de 448.846 a 1.338.842 nos testes).
+Como as 8 threads rodam ao mesmo tempo em núcleos diferentes, duas delas podem ler o mesmo valor (por exemplo, 100) antes que qualquer uma grave. As duas calculam 101 e gravam 101: foram feitos dois incrementos, mas o contador só avançou uma vez. Esse é o *lost update*, típico de uma condição de corrida. O resultado depende de como o escalonador intercala as threads, por isso muda a cada execução.
 
-Além disso, sem sincronização o compilador JIT pode manter `count` em um registrador durante vários incrementos e só gravar depois, o que aumenta ainda mais as perdas.
+Por isso o `volatile` não resolve o problema: ele garante que cada leitura e escrita vá à memória, mas não impede que outra thread leia o valor entre o passo 1 e o passo 3.
 
 ### 2. Por que a versão com semáforo é correta
 
@@ -65,7 +62,7 @@ O `release()` fica em um bloco `finally` para que a permissão seja sempre devol
 
 ### 3. Trade-off de throughput
 
-A correção tem um custo alto: de ~75 ms para ~16 s. Os motivos:
+A correção tem um custo alto: de dezenas de milissegundos para mais de 10 segundos por execução. Os motivos:
 
 - **Serialização:** a seção crítica é praticamente todo o trabalho. Com o semáforo, as 8 threads executam em fila e o paralelismo desaparece. O programa fica mais lento até que uma versão com uma única thread, porque ainda paga o custo de coordenação.
 - **Contenção:** são 1.600.000 operações de `acquire()`/`release()` disputando a mesma permissão, e quase todo `acquire()` encontra o semáforo ocupado.
