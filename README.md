@@ -6,7 +6,6 @@ Repositório com as três partes práticas do trabalho da disciplina de Sistemas
 
 ## Grupo
 
-**Nome do grupo:** PREENCHER
 
 | Integrante | GitHub |
 |---|---|
