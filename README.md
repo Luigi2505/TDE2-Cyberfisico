@@ -1,3 +1,120 @@
+# Trabalho Prático de Programação Concorrente
+
+Repositório com as três partes práticas do trabalho da disciplina de Sistemas Ciberfísicos / Programação Concorrente.
+
+---
+
+# Parte 1 — Jantar dos Filósofos
+
+Implementação do clássico problema do **Jantar dos Filósofos** proposto por Edsger Dijkstra, demonstrando na prática o surgimento de **deadlock** no protocolo ingênuo e sua prevenção por meio da **hierarquia de recursos**.
+
+## Arquivos da Parte 1
+
+| Arquivo | Descrição |
+|---|---|
+| `Garfo.java` | Modela o garfo como um recurso com exclusão mútua usando `Semaphore(1, true)` (semáforo binário justo/FIFO para evitar inanição). |
+| `FilosofoIngenuo.java` | Thread que adquire sempre primeiro o garfo esquerdo e depois o direito (protocolo ingênuo que leva ao deadlock). |
+| `MainIngenuo.java` | Inicializa a simulação da versão ingênua, evidenciando o travamento do sistema. |
+| `Filosofo.java` | Thread corrigida com protocolo de hierarquia de recursos (sempre adquire primeiro o garfo de menor ID). Conta o número de refeições. |
+| `Main.java` | Inicializa a simulação da versão corrigida com progresso contínuo e sem deadlock. |
+
+## Como executar a Parte 1
+
+Dentro do diretório `parte1-filosofos/`:
+
+```bash
+# Compilar todas as classes
+javac *.java
+
+# 1. Executar a versão ingênua (trava em deadlock; encerre com Ctrl + C)
+java MainIngenuo
+
+# 2. Executar a versão corrigida (execução contínua sem travamentos; encerre com Ctrl + C)
+java Main
+```
+
+## Dinâmica do problema e por que o impasse surge
+
+Cinco filósofos sentam-se ao redor de uma mesa redonda. No centro há comida e, entre cada par de filósofos vizinhos, há exatamente um garfo compartilhado (total de 5 garfos). Cada filósofo alterna continuamente entre três estados:
+1. **Pensando** (não precisa de nenhum garfo);
+2. **Com fome** (tenta obter os dois garfos adjacentes);
+3. **Comendo** (está de posse dos dois garfos adjacentes).
+
+No protocolo ingênuo (`FilosofoIngenuo`), todo filósofo pega primeiro o garfo à sua esquerda e, em seguida, tenta pegar o da direita. Quando todos os filósofos sentem fome simultaneamente e pegam seu garfo esquerdo, todos os 5 garfos ficam ocupados. Ao tentarem pegar o garfo da direita, todos encontram o recurso retido pelo vizinho. Ninguém avança, ninguém come e ninguém libera o garfo que possui, caracterizando um **deadlock**.
+
+### Log do console da versão ingênua
+
+```text
+=== Iniciando Versao Ingenua (Com Deadlock) ===
+Filosofo 0 esta pensando.
+Filosofo 1 esta pensando.
+Filosofo 2 esta pensando.
+Filosofo 3 esta pensando.
+Filosofo 4 esta pensando.
+Filosofo 0 esta com fome.
+Filosofo 0 pegou o garfo esquerdo (0).
+Filosofo 1 esta com fome.
+Filosofo 1 pegou o garfo esquerdo (1).
+Filosofo 2 esta com fome.
+Filosofo 2 pegou o garfo esquerdo (2).
+Filosofo 3 esta com fome.
+Filosofo 3 pegou o garfo esquerdo (3).
+Filosofo 4 esta com fome.
+Filosofo 4 pegou o garfo esquerdo (4).
+Filosofo 0 tentando pegar o garfo direito (1)...
+Filosofo 1 tentando pegar o garfo direito (2)...
+Filosofo 2 tentando pegar o garfo direito (3)...
+Filosofo 3 tentando pegar o garfo direito (4)...
+Filosofo 4 tentando pegar o garfo direito (0)...
+<SISTEMA TRAVADO INDEFINIDAMENTE>
+```
+
+## Condições de Coffman no problema dos filósofos
+
+| Condição | Onde aparece no protocolo ingênuo | Estado na versão corrigida |
+|---|---|---|
+| **Exclusão mútua** | Cada garfo só pode ser usado por um filósofo por vez (`Semaphore(1)`). | **Mantida** (garfos são recursos exclusivos). |
+| **Manter e esperar** (*hold and wait*) | O filósofo segura o primeiro garfo enquanto aguarda o segundo. | **Mantida** (continua pegando um por vez). |
+| **Não preempção** | Um filósofo não pode retirar à força o garfo da mão do vizinho. | **Mantida** (o garfo só é liberado voluntariamente). |
+| **Espera circular** | Filósofo 0 espera o garfo do 1, que espera o do 2, que espera o do 3, que espera o do 4, que espera o do 0: `0 → 1 → 2 → 3 → 4 → 0`. | **ELIMINADA / QUEBRADA**. |
+
+### Como a hierarquia de recursos elimina a espera circular
+
+A solução corrigida (`Filosofo.java`) atribui uma ordem total aos garfos através de seus IDs numéricos ($0, 1, 2, 3, 4$). Em vez de pegar sempre o garfo esquerdo primeiro, todo filósofo adquire obrigatoriamente primeiro o garfo com o menor ID e depois o com maior ID:
+
+$$\text{primeiroGarfo} = \min(\text{garfoEsquerdo}, \text{garfoDireito})$$
+$$\text{segundoGarfo} = \max(\text{garfoEsquerdo}, \text{garfoDireito})$$
+
+Os filósofos 0, 1, 2 e 3 pegam na ordem (esquerda, direita), pois seu garfo esquerdo tem índice menor. Já o **Filósofo 4** (entre os garfos 4 e 0) inverte a ordem: pega primeiro o **garfo 0** e depois o **garfo 4**. Com isso, o Filósofo 4 e o Filósofo 0 disputam o mesmo garfo 0 logo no início. Apenas um deles adquire o garfo 0 e o outro fica bloqueado sem segurar nenhum recurso, tornando impossível fechar um ciclo de espera.
+
+## Garantia de progresso e ausência de inanição (Fairness)
+
+1. **Semáforos justos (`new Semaphore(1, true)`)**: O construtor com `fairness = true` garante fila estritamente FIFO (First-In, First-Out) no atendimento das threads que aguardam por cada garfo. Nenhuma thread pode ser preterida indefinidamente pela chegada de novos pedidos.
+2. **Contador de refeições**: A cada ciclo de alimentação, o filósofo exibe no log `[Refeicao #N]`. Em poucos segundos de execução, observa-se que todos os 5 filósofos realizam refeições de forma balanceada.
+
+## Pseudocódigo da hierarquia de recursos
+
+```text
+Para cada filosofo p (0 ate 4):
+    garfo_esq <- p
+    garfo_dir <- (p + 1) mod 5
+    primeiro  <- min(garfo_esq, garfo_dir)
+    segundo   <- max(garfo_esq, garfo_dir)
+
+Repita:
+    pensar()
+    estado <- "com fome"
+    adquirir(primeiro)
+    adquirir(segundo)
+    estado <- "comendo"
+    comer()
+    liberar(segundo)
+    liberar(primeiro)
+    estado <- "pensando"
+```
+
+---
+
 # Parte 2 — Threads e Semáforos: Contador Concorrente
 
 Demonstração de uma condição de corrida em um contador compartilhado e sua correção com um semáforo binário (`java.util.concurrent.Semaphore`).
@@ -91,9 +208,7 @@ O `Semaphore` resolve isso porque a especificação do `java.util.concurrent` ga
 
 Somado à regra de que `Thread.join()` também estabelece happens-before, isso garante que a thread `main` lê o valor final correto de `count` ao imprimir o resultado.
 
-
-
-
+---
 
 # Parte 3 — Deadlock
 

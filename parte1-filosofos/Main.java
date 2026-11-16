@@ -18,8 +18,7 @@ public class Main {
             threads[i] = new Thread(filosofos[i]);
         }
 
-        System.out.println("jantar dos filosofos ");
-
+        System.out.println("Versao Corrigida Hierarquia de Recursos");
 
         for (int i = 0; i < NUM_FILOSOFOS; i++) {
             threads[i].start();

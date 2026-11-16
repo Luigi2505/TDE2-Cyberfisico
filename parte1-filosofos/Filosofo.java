@@ -5,10 +5,11 @@ public class Filosofo implements Runnable {
     private final Garfo primeiroGarfo;
     private final Garfo segundoGarfo;
     private final Random random = new Random();
+    private int refeicoes = 0;
 
     public Filosofo(int id, Garfo garfoEsquerdo, Garfo garfoDireito) {
         this.id = id;
-        
+
         if (garfoEsquerdo.getId() < garfoDireito.getId()) {
             this.primeiroGarfo = garfoEsquerdo;
             this.segundoGarfo = garfoDireito;
@@ -19,12 +20,13 @@ public class Filosofo implements Runnable {
     }
 
     private void pensar() throws InterruptedException {
-        System.out.println("Filosofo " + id + " ta pensando.");
+        System.out.println("Filosofo " + id + " ta pensando");
         Thread.sleep(random.nextInt(1000) + 500);
     }
 
     private void comer() throws InterruptedException {
-        System.out.println("Filosofo " + id + " ta comendo.");
+        refeicoes++;
+        System.out.println("Filosofo " + id + " ta comendo (Refeicao " + refeicoes + ")");
         Thread.sleep(random.nextInt(1000) + 500);
     }
 
@@ -34,18 +36,19 @@ public class Filosofo implements Runnable {
             while (true) {
                 pensar();
 
-                System.out.println("Filosofo " + id + " quer comer e vai tentar pegar os garfo");
+                System.out.println("Filosofo " + id + " ta com fome");
+
                 primeiroGarfo.pegar();
-                System.out.println("Filosofo " + id + " pegou o garfo " + primeiroGarfo.getId());
+                System.out.println("Filosofo " + id + " pegou o garfo " + primeiroGarfo.getId() + ".");
 
                 segundoGarfo.pegar();
-                System.out.println("Filosofo " + id + " pegou o garfo " + segundoGarfo.getId());
+                System.out.println("Filosofo " + id + " pegou o garfo " + segundoGarfo.getId() + ".");
 
                 comer();
 
+                System.out.println("Filosofo " + id + " soltou os garfos " + primeiroGarfo.getId() + " e " + segundoGarfo.getId() + ".");
                 segundoGarfo.soltar();
                 primeiroGarfo.soltar();
-                System.out.println("Filosofo " + id + " soltou os dois garfos e volta a pensar.");
             }
         } catch (InterruptedException e) {
             System.out.println("Filosofo " + id + " foi interrompido.");
