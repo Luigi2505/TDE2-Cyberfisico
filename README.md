@@ -1,6 +1,6 @@
 # Trabalho Prático de Programação Concorrente
 
-**Vídeo de apresentação:** [https://youtu.be/G5BjTPzS8OQ](https://www.youtube.com/)
+**Vídeo de apresentação:** [https://www.youtube.com/](https://youtu.be/G5BjTPzS8OQ)
 
 Repositório com as três partes práticas do trabalho da disciplina de Sistemas Ciberfísicos / Programação Concorrente.
 
@@ -11,7 +11,7 @@ Repositório com as três partes práticas do trabalho da disciplina de Sistemas
 | Integrante | GitHub |
 |---|---|
 | Eric Juan | [EricJuanDM](https://github.com/EricJuanDM) |
-| Guilherme Zamboni de Albuquerque | [GuilhermeAlbuquerque24](https://github.com/GuilhermeAlbuquerque24). |
+| Guilherme Zamboni de Albuquerque | [GuilhermeAlbuquerque24](https://github.com/GuilhermeAlbuquerque24) |
 | Luigi Bilyk de Oliveira | [Luigi2505](https://github.com/Luigi2505) |
 
 **Linguagem:** Java (JDK 17+), usando apenas a API padrão (`Thread`, `synchronized` e `java.util.concurrent.Semaphore`).
