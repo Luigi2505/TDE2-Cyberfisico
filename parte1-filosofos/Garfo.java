@@ -6,21 +6,18 @@ public class Garfo {
 
     public Garfo(int id) {
         this.id = id;
-        this.semaforo = new Semaphore(1); 
+        this.semaforo = new Semaphore(1);
     }
 
     public int getId() {
         return id;
     }
 
-    public Semaphore getSemaforo() {
-        return semaforo;
-    }
-
-    public void pegar() {
+    public void pegar() throws InterruptedException {
+        semaforo.acquire();
     }
 
     public void soltar() {
+        semaforo.release();
     }
 }
-

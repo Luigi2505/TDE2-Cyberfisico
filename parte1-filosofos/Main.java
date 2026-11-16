@@ -18,7 +18,11 @@ public class Main {
             threads[i] = new Thread(filosofos[i]);
         }
 
-        System.out.println("Esqueleto da simulacao do Jantar dos Filosofos pronto.");
+        System.out.println("jantar dos filosofos ");
+
+
+        for (int i = 0; i < NUM_FILOSOFOS; i++) {
+            threads[i].start();
+        }
     }
 }
-
