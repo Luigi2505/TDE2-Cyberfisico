@@ -1,3 +1,95 @@
+# Parte 2 — Threads e Semáforos: Contador Concorrente
+
+Demonstração de uma condição de corrida em um contador compartilhado e sua correção com um semáforo binário (`java.util.concurrent.Semaphore`).
+
+## Arquivos
+
+| Arquivo | Descrição |
+|---|---|
+| `ContadorSemSincronizacao.java` | Versão 1: T threads incrementam `count` sem nenhuma sincronização. |
+| `ContadorComSemaforo.java` | Versão 2: cada incremento é protegido por `Semaphore(1, true)` (binário e justo/FIFO). |
+| `Tabela.java` | Formata a tabela de resultados impressa no terminal. |
+
+Parâmetros usados: **T = 8 threads** e **M = 200.000 incrementos por thread**, valor esperado **T × M = 1.600.000**. Cada programa faz **3 execuções** seguidas e imprime a tabela com os resultados.
+
+## Como executar
+
+Requer JDK 17+. Dentro da pasta `parte2-semaforo`:
+
+```bash
+javac *.java
+java ContadorSemSincronizacao
+java ContadorComSemaforo
+```
+
+A versão com semáforo leva de alguns segundos a mais de meio minuto por execução (veja a discussão sobre throughput).
+
+## Resultados
+
+Ambiente: Windows 11, Java HotSpot 17.0.9.
+
+### Versão 1 — sem sincronização
+
+| Execução | Valor Esperado | Valor Obtido | Perdidos | Tempo Gasto |
+|---|---|---|---|---|
+| 1 | 1.600.000 | 618.821 | 981.179 | 92,21 ms |
+| 2 | 1.600.000 | 556.595 | 1.043.405 | 76,72 ms |
+| 3 | 1.600.000 | 578.789 | 1.021.211 | 73,17 ms |
+
+### Versão 2 — com semáforo binário (justo)
+
+| Execução | Valor Esperado | Valor Obtido | Perdidos | Tempo Gasto |
+|---|---|---|---|---|
+| 1 | 1.600.000 | 1.600.000 | 0 | 36.667,59 ms |
+| 2 | 1.600.000 | 1.600.000 | 0 | 30.608,02 ms |
+| 3 | 1.600.000 | 1.600.000 | 0 | 9.912,73 ms |
+
+A versão sem sincronização perdeu entre 61% e 65% dos incrementos, com um resultado diferente a cada execução. A versão com semáforo chegou ao valor exato nas três execuções, mas levou de 9,9 s a 36,7 s, contra 73 a 92 ms da versão sem sincronização.
+
+> **Sobre o `volatile` na versão 1:** o programa roda as 3 execuções na mesma JVM. Com um `int` comum, a partir da segunda execução o compilador JIT já otimizou `tarefa()`: como nada obriga o valor a ser visível para outras threads, ele pode ler `count` uma vez, somar 200.000 em registrador e gravar uma única vez. A janela de corrida quase some e o resultado sai 1.600.000, escondendo o problema. Com `volatile`, cada `count++` é obrigado a ler e gravar na memória, então o laço não pode ser otimizado assim. O `volatile` **não** torna `count++` atômico (continua sendo ler, somar e gravar), por isso a perda de incrementos continua aparecendo. Ou seja, a versão 1 continua sem exclusão mútua; o `volatile` só impede que a otimização esconda a corrida.
+
+## Discussão técnica
+
+### 1. Por que a versão sem sincronização perde incrementos
+
+A operação `count++` parece única, mas não é atômica. Ela é executada em três passos:
+
+1. **ler** o valor atual de `count` da memória;
+2. **somar 1** no registrador;
+3. **gravar** o resultado de volta na memória.
+
+Como as 8 threads rodam ao mesmo tempo em núcleos diferentes, duas delas podem ler o mesmo valor (por exemplo, 100) antes que qualquer uma grave. As duas calculam 101 e gravam 101: foram feitos dois incrementos, mas o contador só avançou uma vez. Esse é o *lost update*, típico de uma condição de corrida. O resultado depende de como o escalonador intercala as threads, por isso muda a cada execução.
+
+Por isso o `volatile` não resolve o problema: ele garante que cada leitura e escrita vá à memória, mas não impede que outra thread leia o valor entre o passo 1 e o passo 3.
+
+### 2. Por que a versão com semáforo é correta
+
+O semáforo é criado com **uma única permissão**, então funciona como exclusão mútua (mutex). Uma thread só executa `count++` depois de obter a permissão com `acquire()`, e as outras ficam bloqueadas até ela chamar `release()`. Assim, os três passos (ler, somar, gravar) são executados por uma thread de cada vez, sem intercalação, e nenhum incremento se perde.
+
+O `release()` fica em um bloco `finally` para que a permissão seja sempre devolvida, mesmo se ocorrer uma exceção. Caso contrário, as outras threads ficariam bloqueadas para sempre.
+
+### 3. Trade-off de throughput
+
+A correção tem um custo alto: de 73–92 ms para 9,9–36,7 s por execução, ou seja, de cerca de 100 a 500 vezes mais lenta. A grande variação entre as execuções da versão 2 também mostra como o tempo depende do escalonamento das threads pelo sistema operacional. Os motivos:
+
+- **Serialização:** a seção crítica é praticamente todo o trabalho. Com o semáforo, as 8 threads executam em fila e o paralelismo desaparece: só uma thread incrementa por vez.
+- **Contenção:** são 1.600.000 operações de `acquire()`/`release()` disputando a mesma permissão, e quase todo `acquire()` encontra o semáforo ocupado.
+- **Trocas de contexto:** a thread que não consegue a permissão é estacionada (*park*) pelo sistema operacional e depois precisa ser acordada (*unpark*). Cada transição custa microssegundos, muito mais que o próprio `count++`, que leva nanossegundos.
+- **Fairness (justiça):** com `new Semaphore(1, true)` as permissões são entregues em ordem FIFO, então nenhuma thread sofre *starvation*. O custo é que a thread que acabou de liberar não pode readquirir a permissão logo em seguida, mesmo ainda estando em execução: ela precisa passar a vez para a próxima da fila, que tem de ser acordada. Isso força uma troca de contexto praticamente a cada incremento. Um semáforo não justo (`new Semaphore(1)`) permite que a thread "fure a fila" (*barging*), o que costuma dar um throughput bem maior, mas sem garantia de ordem.
+
+Para um contador simples, alternativas como `AtomicInteger` (instrução CAS do hardware) ou acumular localmente e somar só no final seriam muito mais eficientes. O semáforo compensa quando a seção crítica é maior e o custo da sincronização fica pequeno perto do trabalho realizado.
+
+### 4. Visibilidade e ordenação (happens-before)
+
+Além da atomicidade, existe o problema da **visibilidade**. Cada núcleo tem seus caches e registradores, e o compilador e o processador podem reordenar instruções. Sem sincronização, o Java Memory Model não garante que uma thread veja o valor que outra gravou em `count`.
+
+O `Semaphore` resolve isso porque a especificação do `java.util.concurrent` garante que as ações de uma thread antes de chamar `release()` **acontecem antes (happens-before)** das ações de outra thread após um `acquire()` bem-sucedido. Na prática:
+
+- tudo o que a thread A gravou antes de `release()` (incluindo o novo valor de `count`) se torna visível para a thread B depois do `acquire()`;
+- o valor não fica preso no cache ou registrador local de A;
+- o compilador e o processador não podem mover a escrita de `count` para fora da seção crítica.
+
+Somado à regra de que `Thread.join()` também estabelece happens-before, isso garante que a thread `main` lê o valor final correto de `count` ao imprimir o resultado.
 
 
 
