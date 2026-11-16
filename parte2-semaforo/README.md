@@ -22,7 +22,7 @@ java ContadorSemSincronizacao
 java ContadorComSemaforo
 ```
 
-A versão com semáforo leva alguns segundos por execução (veja a discussão sobre throughput).
+A versão com semáforo leva de alguns segundos a mais de meio minuto por execução (veja a discussão sobre throughput).
 
 ## Resultados
 
@@ -30,15 +30,23 @@ Ambiente: Windows 11, Java HotSpot 17.0.9.
 
 ### Versão 1 — sem sincronização
 
-![Resultados da versão 1](img/versao1.png)
+| Execução | Valor Esperado | Valor Obtido | Perdidos | Tempo Gasto |
+|---|---|---|---|---|
+| 1 | 1.600.000 | 618.821 | 981.179 | 92,21 ms |
+| 2 | 1.600.000 | 556.595 | 1.043.405 | 76,72 ms |
+| 3 | 1.600.000 | 578.789 | 1.021.211 | 73,17 ms |
 
 ### Versão 2 — com semáforo binário (justo)
 
-![Resultados da versão 2](img/versao2.png)
+| Execução | Valor Esperado | Valor Obtido | Perdidos | Tempo Gasto |
+|---|---|---|---|---|
+| 1 | 1.600.000 | 1.600.000 | 0 | 36.667,59 ms |
+| 2 | 1.600.000 | 1.600.000 | 0 | 30.608,02 ms |
+| 3 | 1.600.000 | 1.600.000 | 0 | 9.912,73 ms |
 
-A versão sem sincronização perde uma grande parte dos incrementos, com um resultado diferente a cada execução. A versão com semáforo chega ao valor exato em todas as execuções, mas fica centenas de vezes mais lenta.
+A versão sem sincronização perdeu entre 61% e 65% dos incrementos, com um resultado diferente a cada execução. A versão com semáforo chegou ao valor exato nas três execuções, mas levou de 9,9 s a 36,7 s, contra 73 a 92 ms da versão sem sincronização.
 
-> Na versão 1, `count` é declarado como `volatile`. Sem isso, a partir da segunda execução o JIT otimiza o laço e passa a somar tudo de uma vez, o que esconde a corrida. O `volatile` garante que cada `count++` leia e grave na memória, mas **não** torna a operação atômica, então a perda de incrementos continua.
+> **Sobre o `volatile` na versão 1:** o programa roda as 3 execuções na mesma JVM. Com um `int` comum, a partir da segunda execução o compilador JIT já otimizou `tarefa()`: como nada obriga o valor a ser visível para outras threads, ele pode ler `count` uma vez, somar 200.000 em registrador e gravar uma única vez. A janela de corrida quase some e o resultado sai 1.600.000, escondendo o problema. Com `volatile`, cada `count++` é obrigado a ler e gravar na memória, então o laço não pode ser otimizado assim. O `volatile` **não** torna `count++` atômico (continua sendo ler, somar e gravar), por isso a perda de incrementos continua aparecendo. Ou seja, a versão 1 continua sem exclusão mútua; o `volatile` só impede que a otimização esconda a corrida.
 
 ## Discussão técnica
 
@@ -62,9 +70,9 @@ O `release()` fica em um bloco `finally` para que a permissão seja sempre devol
 
 ### 3. Trade-off de throughput
 
-A correção tem um custo alto: de dezenas de milissegundos para mais de 10 segundos por execução. Os motivos:
+A correção tem um custo alto: de 73–92 ms para 9,9–36,7 s por execução, ou seja, de cerca de 100 a 500 vezes mais lenta. A grande variação entre as execuções da versão 2 também mostra como o tempo depende do escalonamento das threads pelo sistema operacional. Os motivos:
 
-- **Serialização:** a seção crítica é praticamente todo o trabalho. Com o semáforo, as 8 threads executam em fila e o paralelismo desaparece. O programa fica mais lento até que uma versão com uma única thread, porque ainda paga o custo de coordenação.
+- **Serialização:** a seção crítica é praticamente todo o trabalho. Com o semáforo, as 8 threads executam em fila e o paralelismo desaparece: só uma thread incrementa por vez.
 - **Contenção:** são 1.600.000 operações de `acquire()`/`release()` disputando a mesma permissão, e quase todo `acquire()` encontra o semáforo ocupado.
 - **Trocas de contexto:** a thread que não consegue a permissão é estacionada (*park*) pelo sistema operacional e depois precisa ser acordada (*unpark*). Cada transição custa microssegundos, muito mais que o próprio `count++`, que leva nanossegundos.
 - **Fairness (justiça):** com `new Semaphore(1, true)` as permissões são entregues em ordem FIFO, então nenhuma thread sofre *starvation*. O custo é que a thread que acabou de liberar não pode readquirir a permissão logo em seguida, mesmo ainda estando em execução: ela precisa passar a vez para a próxima da fila, que tem de ser acordada. Isso força uma troca de contexto praticamente a cada incremento. Um semáforo não justo (`new Semaphore(1)`) permite que a thread "fure a fila" (*barging*), o que costuma dar um throughput bem maior, mas sem garantia de ordem.
