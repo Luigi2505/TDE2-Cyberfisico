@@ -8,7 +8,7 @@ private static final Object LOCK_B = new Object();
         Thread t1 = new Thread(() -> {
             synchronized (LOCK_A) {
                 System.out.println("[Thread-1] Adquiriu LOCK_A");
-                dormir(50); // garante que a Thread-2 já pegou o LOCK_B
+                dormir(50);
                 System.out.println("[Thread-1] Tentando adquirir LOCK_B...");
                 synchronized (LOCK_B) {
                     System.out.println("[Thread-1] Adquiriu LOCK_B (nunca chega aqui)");
