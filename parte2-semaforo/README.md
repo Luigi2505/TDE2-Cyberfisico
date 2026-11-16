@@ -28,7 +28,7 @@ Ambiente: Windows 11, Java HotSpot 17.0.9.
 ### Versão 1 — sem sincronização
 
 | Execução | Valor Esperado | Valor Obtido | Tempo Gasto |
-
+|---|---|---|---|
 | 1 | 1.600.000 | 448.846 | 77,04 ms |
 | 2 | 1.600.000 | 464.021 | 104,14 ms |
 | 3 | 1.600.000 | 1.338.842 | 51,46 ms |
@@ -36,12 +36,12 @@ Ambiente: Windows 11, Java HotSpot 17.0.9.
 ### Versão 2 — com semáforo binário (justo)
 
 | Execução | Valor Esperado | Valor Obtido | Tempo Gasto |
-
+|---|---|---|---|
 | 1 | 1.600.000 | 1.600.000 | 15.798,44 ms |
 | 2 | 1.600.000 | 1.600.000 | 14.184,89 ms |
 | 3 | 1.600.000 | 1.600.000 | 18.550,07 ms |
 
-A versão sem sincronização perdeu entre 16% e 72% dos incrementos, com um resultado diferente a cada execução. A versão com semáforo chegou ao valor exato nas três execuções, mas foi cerca de **200 vezes mais lenta**.
+A versão sem sincronização perdeu entre ~16% e ~72% dos incrementos, com um resultado diferente a cada execução. A versão com semáforo chegou ao valor exato nas três execuções, mas foi cerca de **200 vezes mais lenta**.
 
 ## Discussão técnica
 
@@ -65,7 +65,7 @@ O `release()` fica em um bloco `finally` para que a permissão seja sempre devol
 
 ### 3. Trade-off de throughput
 
-A correção tem um custo alto: de 75 ms para 16 s. Os motivos:
+A correção tem um custo alto: de ~75 ms para ~16 s. Os motivos:
 
 - **Serialização:** a seção crítica é praticamente todo o trabalho. Com o semáforo, as 8 threads executam em fila e o paralelismo desaparece. O programa fica mais lento até que uma versão com uma única thread, porque ainda paga o custo de coordenação.
 - **Contenção:** são 1.600.000 operações de `acquire()`/`release()` disputando a mesma permissão, e quase todo `acquire()` encontra o semáforo ocupado.
