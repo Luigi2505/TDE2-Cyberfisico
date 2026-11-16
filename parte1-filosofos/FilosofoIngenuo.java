@@ -13,13 +13,13 @@ public class FilosofoIngenuo implements Runnable {
     }
 
     private void pensar() throws InterruptedException {
-        System.out.println("Filosofo " + id + " ta pensando");
-        Thread.sleep(random.nextInt(100) + 50);
+        System.out.println("Filosofo " + id + " esta pensando.");
+        Thread.sleep(random.nextInt(50) + 10);
     }
 
     private void comer() throws InterruptedException {
-        System.out.println("Filosofo " + id + " ta comendo");
-        Thread.sleep(random.nextInt(200) + 100);
+        System.out.println("Filosofo " + id + " esta comendo.");
+        Thread.sleep(random.nextInt(100) + 50);
     }
 
     @Override
@@ -28,13 +28,18 @@ public class FilosofoIngenuo implements Runnable {
             while (true) {
                 pensar();
 
-                System.out.println("Filosofo " + id + " ta com fome");
+                System.out.println("Filosofo " + id + " esta com fome.");
 
+                // 1. Pega sempre o garfo esquerdo primeiro
                 garfoEsquerdo.pegar();
                 System.out.println("Filosofo " + id + " pegou o garfo esquerdo (" + garfoEsquerdo.getId() + ").");
 
-                Thread.sleep(50);
+                // Pausa crucial: enquanto este filosofo segura o garfo esquerdo,
+                // os vizinhos tambem acordam e pegam seus respectivos garfos esquerdos.
+                Thread.sleep(200);
 
+                // 2. Tenta pegar o garfo direito (todos encontram ocupado -> DEADLOCK)
+                System.out.println("Filosofo " + id + " tentando pegar o garfo direito (" + garfoDireito.getId() + ")...");
                 garfoDireito.pegar();
                 System.out.println("Filosofo " + id + " pegou o garfo direito (" + garfoDireito.getId() + ").");
 
