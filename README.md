@@ -1,6 +1,30 @@
 # Trabalho Prático de Programação Concorrente
 
+**Vídeo de apresentação:** [PREENCHER — link do YouTube](https://www.youtube.com/)
+
 Repositório com as três partes práticas do trabalho da disciplina de Sistemas Ciberfísicos / Programação Concorrente.
+
+## Grupo
+
+**Nome do grupo:** PREENCHER
+
+| Integrante | GitHub |
+|---|---|
+| Eric Juan PREENCHER SOBRENOME | [EricJuanDM](https://github.com/EricJuanDM) |
+| Guilherme Zamboni de Albuquerque | PREENCHER |
+| Luigi Bilyk de Oliveira | [Luigi2505](https://github.com/Luigi2505) |
+
+**Linguagem:** Java (JDK 17+), usando apenas a API padrão (`Thread`, `synchronized` e `java.util.concurrent.Semaphore`).
+
+## Estrutura
+
+| Pasta | Conteúdo |
+|---|---|
+| [`parte1-filosofos/`](parte1-filosofos) | Jantar dos Filósofos: versão ingênua com deadlock e versão corrigida por hierarquia de recursos. |
+| [`parte2-semaforo/`](parte2-semaforo) | Contador concorrente: condição de corrida e correção com semáforo binário. |
+| [`parte3-deadlock/`](parte3-deadlock) | Deadlock com dois locks e correção por ordem global de aquisição. |
+
+Cada parte é compilada e executada dentro da sua própria pasta, como descrito nas seções abaixo.
 
 ---
 
@@ -42,32 +66,37 @@ Cinco filósofos sentam-se ao redor de uma mesa redonda. No centro há comida e,
 
 No protocolo ingênuo (`FilosofoIngenuo`), todo filósofo pega primeiro o garfo à sua esquerda e, em seguida, tenta pegar o da direita. Quando todos os filósofos sentem fome simultaneamente e pegam seu garfo esquerdo, todos os 5 garfos ficam ocupados. Ao tentarem pegar o garfo da direita, todos encontram o recurso retido pelo vizinho. Ninguém avança, ninguém come e ninguém libera o garfo que possui, caracterizando um **deadlock**.
 
+Para tornar o impasse fácil de observar, `FilosofoIngenuo` espera 200 ms depois de pegar o garfo esquerdo, dando tempo para os vizinhos pegarem os seus. Mesmo assim, o deadlock depende do escalonamento das threads: ele **pode** acontecer, mas não é garantido. Se a execução não travar, basta encerrar com `Ctrl + C` e rodar `java MainIngenuo` de novo.
+
 ### Log do console da versão ingênua
 
+Saída real de `java MainIngenuo`:
+
 ```text
-=== Iniciando Versao Ingenua (Com Deadlock) ===
-Filosofo 0 esta pensando.
-Filosofo 1 esta pensando.
-Filosofo 2 esta pensando.
+Versao ingenua com deadlock
 Filosofo 3 esta pensando.
+Filosofo 1 esta pensando.
+Filosofo 0 esta pensando.
 Filosofo 4 esta pensando.
+Filosofo 2 esta pensando.
 Filosofo 0 esta com fome.
-Filosofo 0 pegou o garfo esquerdo (0).
+Filosofo 4 esta com fome.
+Filosofo 2 esta com fome.
 Filosofo 1 esta com fome.
 Filosofo 1 pegou o garfo esquerdo (1).
-Filosofo 2 esta com fome.
 Filosofo 2 pegou o garfo esquerdo (2).
+Filosofo 0 pegou o garfo esquerdo (0).
+Filosofo 4 pegou o garfo esquerdo (4).
 Filosofo 3 esta com fome.
 Filosofo 3 pegou o garfo esquerdo (3).
-Filosofo 4 esta com fome.
-Filosofo 4 pegou o garfo esquerdo (4).
-Filosofo 0 tentando pegar o garfo direito (1)...
 Filosofo 1 tentando pegar o garfo direito (2)...
+Filosofo 0 tentando pegar o garfo direito (1)...
 Filosofo 2 tentando pegar o garfo direito (3)...
-Filosofo 3 tentando pegar o garfo direito (4)...
 Filosofo 4 tentando pegar o garfo direito (0)...
-<SISTEMA TRAVADO INDEFINIDAMENTE>
+Filosofo 3 tentando pegar o garfo direito (4)...
 ```
+
+Depois da última linha nada mais é impresso e o programa não termina: os 5 garfos estão ocupados e cada filósofo espera o garfo do vizinho. Nenhuma mensagem "pegou o garfo direito" aparece.
 
 ## Condições de Coffman no problema dos filósofos
 
@@ -90,7 +119,51 @@ Os filósofos 0, 1, 2 e 3 pegam na ordem (esquerda, direita), pois seu garfo esq
 ## Garantia de progresso e ausência de inanição (Fairness)
 
 1. **Semáforos justos (`new Semaphore(1, true)`)**: O construtor com `fairness = true` garante fila estritamente FIFO (First-In, First-Out) no atendimento das threads que aguardam por cada garfo. Nenhuma thread pode ser preterida indefinidamente pela chegada de novos pedidos.
-2. **Contador de refeições**: A cada ciclo de alimentação, o filósofo exibe no log `[Refeicao #N]`. Em poucos segundos de execução, observa-se que todos os 5 filósofos realizam refeições de forma balanceada.
+2. **Contador de refeições**: A cada ciclo de alimentação, o filósofo exibe no log `(Refeicao N)`, por exemplo `Filosofo 0 ta comendo (Refeicao 1)`. Com isso dá para conferir que todos os 5 filósofos comem de forma balanceada.
+
+### Execução da versão corrigida
+
+Início da saída real de `java Main`:
+
+```text
+Versao Corrigida Hierarquia de Recursos
+Filosofo 0 ta pensando
+Filosofo 3 ta pensando
+Filosofo 2 ta pensando
+Filosofo 4 ta pensando
+Filosofo 1 ta pensando
+Filosofo 0 ta com fome
+Filosofo 0 pegou o garfo 0.
+Filosofo 0 pegou o garfo 1.
+Filosofo 0 ta comendo (Refeicao 1)
+Filosofo 1 ta com fome
+Filosofo 3 ta com fome
+Filosofo 3 pegou o garfo 3.
+Filosofo 3 pegou o garfo 4.
+Filosofo 3 ta comendo (Refeicao 1)
+Filosofo 4 ta com fome
+Filosofo 2 ta com fome
+Filosofo 2 pegou o garfo 2.
+Filosofo 0 soltou os garfos 0 e 1.
+Filosofo 0 ta pensando
+Filosofo 1 pegou o garfo 1.
+Filosofo 4 pegou o garfo 0.
+...
+```
+
+Note que o Filósofo 4 pega primeiro o **garfo 0** (o de menor índice), como manda a hierarquia.
+
+Deixando o programa rodar por 30 segundos, o número de refeições de cada filósofo (última `(Refeicao N)` impressa por cada um) foi:
+
+| Filósofo | Refeições em 30 s |
+|---|---|
+| 0 | 12 |
+| 1 | 11 |
+| 2 | 12 |
+| 3 | 12 |
+| 4 | 11 |
+
+O sistema não travou e a diferença entre o filósofo que mais comeu e o que menos comeu foi de apenas 1 refeição, o que mostra progresso contínuo e ausência de inanição.
 
 ## Pseudocódigo da hierarquia de recursos
 
@@ -245,7 +318,7 @@ synchronized (LOCK_A) {              synchronized (LOCK_B) {
 }                                    }
 ```
 
-O `Thread.sleep(50)` entre as duas aquisições garante que cada thread pegue seu primeiro lock antes de a outra tentar pegá-lo, tornando o deadlock praticamente determinístico.
+O `Thread.sleep(50)` entre as duas aquisições aumenta muito a chance de cada thread pegar seu primeiro lock antes de a outra tentar pegá-lo. Na prática o deadlock acontece em quase todas as execuções, mas, como depende do escalonamento das threads, não é 100% garantido.
 
 ### Log do console
 

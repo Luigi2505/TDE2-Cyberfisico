@@ -35,7 +35,7 @@ public class ContadorSemSincronizacao {
 
     private static void tarefa() {
         for (int i = 0; i < INCREMENTOS; i++) {
-            count++; // leitura, soma e escrita nao atomicas: condicao de corrida
+            count++;
         }
     }
 }
